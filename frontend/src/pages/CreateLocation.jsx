@@ -6,7 +6,7 @@ import { setAuthHeader } from "../utils/api";
 import ConfirmationModal from "../components/ConfirmationModal";
 
 const { Option } = Select;
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api";
 
 const CreateLocation = () => {
   const navigate = useNavigate();

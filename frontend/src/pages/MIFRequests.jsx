@@ -29,7 +29,7 @@ const MIFRequests = ({ role }) => {
   const [selectedComponent, setSelectedComponent] = useState(null);
 
   useEffect(() => {
-    const socket = io("http://localhost:5000", {
+    const socket = io("https://erp1-iwt1.onrender.com", {
       query: { userId: userId },
     });
 
@@ -232,7 +232,7 @@ const MIFRequests = ({ role }) => {
     }
 
     try {
-      await fetch(`http://localhost:5000/api/nc-requests/cancel/${selectedRequest.umi}`, {
+      await fetch(`https://erp1-iwt1.onrender.com/api/nc-requests/cancel/${selectedRequest.umi}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -275,7 +275,7 @@ const MIFRequests = ({ role }) => {
         component_id: item.component_id,
         received_quantity: parseInt(item.receivedQty) || 0,
       }));
-      await fetch(`http://localhost:5000/api/nc-requests/confirm-receipt/${selectedRequest.umi}`, {
+      await fetch(`https://erp1-iwt1.onrender.com/api/nc-requests/confirm-receipt/${selectedRequest.umi}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,

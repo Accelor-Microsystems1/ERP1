@@ -7,7 +7,7 @@ const AdminLogs = () => {
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/admin/logs", {
+                const response = await axios.get("https://erp1-iwt1.onrender.com/api/admin/logs", {
                     headers: { Authorization: `${localStorage.getItem("token")}` }
                 });
                 setLogs(response.data);

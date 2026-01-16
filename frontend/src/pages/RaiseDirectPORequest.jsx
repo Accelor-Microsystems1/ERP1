@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import Loader from "../components/loading.jsx";
 
 // API base URL for direct axios calls
-const API_BASE_URL = "http://localhost:5000/api/non_coc_components";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api/non_coc_components";
 
 const RaiseDirectPORequest = () => {
   // State declarations

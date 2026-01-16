@@ -8,7 +8,7 @@ import moment from 'moment';
 
 const { Option } = Select;
 
-const API_BASE_URL = "http://localhost:5000/api/non_coc_components";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api/non_coc_components";
 
 const ReviewPORequest = () => {
   const { state } = useLocation();

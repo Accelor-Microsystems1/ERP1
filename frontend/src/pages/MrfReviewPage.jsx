@@ -55,7 +55,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const { Option } = Select;
 
-const API_BASE_URL = "http://localhost:5000/api/non_coc_components";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api/non_coc_components";
 
 const MrfReviewPage = () => {
   useEffect(() => {
@@ -265,7 +265,7 @@ useEffect(() => {
         // Fetch component_id and uom if missing
         if (!componentId || !uom || uom === '-') {
           try {
-            const response = await axios.get('http://localhost:5000/api/non_coc_components/search', {
+            const response = await axios.get('https://erp1-iwt1.onrender.com/api/non_coc_components/search', {
               params: { query: c.part_no, type: 'part_no' },
             });
             const match = response.data.find((item) => item.part_no === c.part_no);

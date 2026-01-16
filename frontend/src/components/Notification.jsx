@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
 import io from 'socket.io-client';
 
-const socket = io("http://localhost:5000", {
+const socket = io("https://erp1-iwt1.onrender.com", {
   withCredentials: true,
   auth: {
     token: localStorage.getItem("token"),
@@ -107,7 +107,7 @@ const NotificationBell = () => {
     const fetchNotifications = async () => {
       try {
         console.log('NotificationBell: Fetching initial notifications for userId:', userId, 'with role:', userRole);
-        const response = await fetch("http://localhost:5000/api/notifications/pending", {
+        const response = await fetch("https://erp1-iwt1.onrender.com/api/notifications/pending", {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
@@ -168,7 +168,7 @@ const NotificationBell = () => {
   const markNotificationAsRead = async (notificationId) => {
     try {
       console.log('NotificationBell: Marking notification as read, id:', notificationId);
-      const url = `http://localhost:5000/api/notifications/${notificationId}/read`;
+      const url = `https://erp1-iwt1.onrender.com/api/notifications/${notificationId}/read`;
       console.log('NotificationBell: Constructed URL for markNotificationAsRead:', url);
 
       const response = await fetch(url, {

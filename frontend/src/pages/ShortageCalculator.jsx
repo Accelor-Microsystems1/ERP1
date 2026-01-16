@@ -25,7 +25,7 @@ import { fetchPendingNonCOCIssueRequests } from "../utils/api.js";
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, ChartTooltip, Legend);
 
-const API_BASE_URL = "http://localhost:5000/api/non_coc_components";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api/non_coc_components";
 
 const ShortageCalculator = () => {
   const [bomItems, setBomItems] = useState([]);

@@ -140,7 +140,7 @@ const App = () => {
 
   useEffect(() => {
     if (userId) {
-      const newSocket = io("http://localhost:5000", {
+      const newSocket = io("https://erp1-iwt1.onrender.com", {
         withCredentials: true,
         auth: {
           token: localStorage.getItem("token"),

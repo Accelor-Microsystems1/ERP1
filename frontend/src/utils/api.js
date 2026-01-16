@@ -1,7 +1,7 @@
 import axios from 'axios';
 import moment from 'moment';
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api";
 
 // Export setAuthHeader
 export const setAuthHeader = () => {

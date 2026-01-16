@@ -35,7 +35,7 @@ const QualityCheckpoints = () => {
 
   const fetchCheckpoints = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/quality-checkpoints');
+      const response = await axios.get('https://erp1-iwt1.onrender.com/api/quality-checkpoints');
       setCheckpoints(response.data);
     } catch (error) {
       setErrors((prev) => ({ ...prev, fetch: 'Failed to fetch checkpoints' }));
@@ -73,7 +73,7 @@ const QualityCheckpoints = () => {
   // Save quality check points
   const confirmSave = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/quality-checkpoints/create', formData);
+      const response = await axios.post('https://erp1-iwt1.onrender.com/api/quality-checkpoints/create', formData);
       setIsModalOpen(false);
       setFormData({ title: '', product_categories: '', control_per: '', instructions: '' });
       setErrors({});

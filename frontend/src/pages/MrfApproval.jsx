@@ -21,7 +21,7 @@ import NotesSection from "../components/NotesSection";
 import moment from "moment";
 
 const { Option } = Select;
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://erp1-iwt1.onrender.com/api";
 
 const MrfApproval = ({ role, permissions }) => {
   const [requests, setRequests] = useState([]);
