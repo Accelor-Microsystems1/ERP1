@@ -42,7 +42,7 @@ const io = require('socket.io')(server, {
   cors: {
     origin: [
       
-      "https://erp1-1-ih0r.onrender.com" // production
+      "*" // production
     ],
     methods: ["GET", "POST"]
   }
@@ -63,7 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: "https://erp1-1-ih0r.onrender.com",
+    origin: "*",
     credentials: true,
   })
 );
