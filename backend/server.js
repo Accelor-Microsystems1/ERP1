@@ -38,13 +38,16 @@ const directPoRoutes = require('./routes/directPoRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
+const io = require('socket.io')(server, {
   cors: {
-    origin: "https://erp1-1-ih0r.onrender.com/",
-    methods: ["GET", "POST", "PATCH", "PUT"],
-    credentials: true,
-  },
+    origin: [
+      
+      "https://erp1-1-ih0r.onrender.com" // production
+    ],
+    methods: ["GET", "POST"]
+  }
 });
+
 
 // Serve static files from the uploads directory
 app.use("/uploads", express.static(path.join(__dirname, "Uploads")));
