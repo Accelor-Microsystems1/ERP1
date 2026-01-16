@@ -40,7 +40,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "https://erp1-1-ih0r.onrender.com/",
     methods: ["GET", "POST", "PATCH", "PUT"],
     credentials: true,
   },
@@ -60,7 +60,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://erp1-1-ih0r.onrender.com/",
     credentials: true,
   })
 );
