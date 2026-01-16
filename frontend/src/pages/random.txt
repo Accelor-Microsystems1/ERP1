@@ -1,0 +1,1792 @@
+import axios from 'axios';
+import moment from 'moment';
+
+const API_BASE_URL = "http://localhost:5000/api";
+
+// Export setAuthHeader
+export const setAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    console.warn('No auth token found!');
+    return { headers: {} };
+  }
+  return { headers: { Authorization: `Bearer ${token}` } };
+};
+
+export const fetchUsers = async (roleId = null) => {
+  try {
+    const url = roleId ? `${API_BASE_URL}/users?role_id=${roleId}` : `${API_BASE_URL}/users`;
+    const response = await axios.get(url, setAuthHeader());
+    console.log("Fetched users:", response.data);
+
+    const users = Array.isArray(response.data) ? response.data : [];
+
+    const formattedUsers = users.map(user => ({
+      id: user.id || null,
+      name: user.name || 'N/A',
+      email: user.email || 'N/A',
+      department: user.department || 'N/A',
+      designation: user.designation || 'N/A',
+      role: user.role || 'N/A',
+      role_id: user.role_id || null,
+      role_name: user.role_name || 'N/A',
+      signature: user.signature || null,
+      created_at: user.created_at ? moment(user.created_at).format('YYYY-MM-DD HH:mm:ss') : 'N/A',
+      updated_at: user.updated_at ? moment(user.updated_at).format('YYYY-MM-DD HH:mm:ss') : 'N/A',
+      permissions: user.permissions || {},
+    }));
+
+    console.log("Formatted users:", formattedUsers);
+    return formattedUsers;
+  } catch (error) {
+    console.error("Error fetching users:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch users: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+export const updateUser = async (userId, formData) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/users/${userId}`, formData, {
+      ...setAuthHeader(),
+      headers: {
+        ...setAuthHeader().headers,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    console.log("Updated user:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating user:", error.response?.data || error.message);
+    throw new Error(`Failed to update user: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+export const createUser = async (userData) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/users/create-user`, userData, {
+      ...setAuthHeader(),
+      headers: {
+        ...setAuthHeader().headers,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    console.log("Created user:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating user:", error.response?.data || error.message);
+    throw new Error(`Failed to create user: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+export const deleteUser = async (userId) => {
+  try {
+    const response = await axios.delete(`${API_BASE_URL}/users/${userId}`, setAuthHeader());
+    console.log("Deleted user:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting user:", error.response?.data || error.message);
+    throw new Error(`Failed to delete user: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+// Fetch all roles with their permissions and modules
+export const fetchRoles = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/users/roles`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch roles');
+  }
+};
+
+// In api.js
+export const fetchComponentsForMRR = async (poNumber) => {
+  try {
+    const encodedPoNumber = encodeURIComponent(poNumber);
+    const response = await axios.get(
+      `${API_BASE_URL}/quality-inspection/mrr-components/${encodedPoNumber}`,
+      setAuthHeader()
+    );
+    console.log("Fetched components raw response:", response.data);
+
+    // Ensure the response is an array and contains mrr_no
+    const components = Array.isArray(response.data.data) ? response.data.data : [];
+    if (components.length > 0 && response.data.mrr_no) {
+      components.forEach(comp => {
+        comp.mrr_no = response.data.mrr_no; // Ensure mrr_no is set on each component
+      });
+    }
+
+    console.log("Processed components with mrr_no:", components);
+    return components;
+  } catch (error) {
+    console.error("Error fetching components for MRR:", error);
+    throw new Error(`Failed to fetch components: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const uploadMRRDocuments = async (poNumber, components, cocFiles = [], idFiles = [], backorderSequence = null) => {
+  const token = localStorage.getItem('token');
+  const formData = new FormData();
+
+  formData.append('po_number', poNumber || '');
+  if (backorderSequence !== null && backorderSequence !== undefined) {
+    formData.append('backorder_sequence', backorderSequence);
+  }
+
+  const mpnValues = components.map(component => component.mpn || '').filter(Boolean).join(',');
+  formData.append('mpn', mpnValues);
+
+  cocFiles.forEach((file, index) => {
+    formData.append(`coc[]`, file);
+  });
+
+  idFiles.forEach((file, index) => {
+    formData.append(`idCard[]`, file);
+  });
+
+  console.log('FormData entries:');
+  for (let [key, value] of formData.entries()) {
+    console.log(`FormData: ${key} = ${value.name || value}`);
+  }
+
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/quality-inspection/mrr-upload-documents`,
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    console.log('Upload response:', response.data);
+    return {
+      message: response.data.message,
+      mrr_no: response.data.mrr_no || 'N/A', // Ensure mrr_no is always returned
+      data: response.data.data,
+    };
+  } catch (error) {
+    const errorMessage = error.response?.data?.error || error.message || 'Failed to upload MRR documents';
+    console.error('Upload error:', {
+      message: errorMessage,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+    throw new Error(errorMessage);
+  }
+};
+//   console.log("Preparing FormData with:", { po_number, part_no, cocFile: cocFile?.name, idCardFile: idCardFile?.name });
+
+//   const formData = new FormData();
+//   formData.append('po_number', po_number);
+//   formData.append('part_no', part_no);
+//   if (cocFile) formData.append('coc', cocFile);
+//   if (idCardFile) formData.append('idCard', idCardFile);
+
+//   const formDataEntries = {};
+//   for (let [key, value] of formData.entries()) {
+//     formDataEntries[key] = value instanceof File ? value.name : value;
+//   }
+//   console.log("FormData entries being sent:", formDataEntries);
+
+//   try {
+//     const response = await axios.post(
+//       `${API_BASE_URL}/quality-inspection/mrr-upload-documents`,
+//       formData,
+//       {
+//         headers: {
+//           Authorization: `Bearer ${localStorage.getItem('token')}`,
+//           'Content-Type': 'multipart/form-data',
+//         },
+//       }
+//     );
+//     console.log("Upload response:", response.data);
+//     return response.data;
+//   } catch (error) {
+//     console.error("Upload error:", error.response?.data || error.message);
+//     throw error;
+//   }
+// };
+
+//   console.log("Preparing FormData with:", { cocFile, idCardFile });
+
+//   const formData = new FormData();
+//   //formData.append('po_number', po_number);
+//   //formData.append('part_no', part_no);
+//   // if (cocFile) formData.append('coc', cocFile);
+//   // if (idCardFile) formData.append('idCard', idCardFile);
+
+//   // const formDataEntries = {};
+//   // for (let [key, value] of formData.entries()) {
+//   //   formDataEntries[key] = value instanceof File ? value.name : value;
+//   // }
+//   // console.log("FormData entries:", formDataEntries);
+
+//   return await axios.post(`${API_BASE_URL}/quality-inspection/mrr-upload-documents`, formData, {
+//     headers: {
+//       Authorization: `Bearer ${localStorage.getItem('token')}`,
+//     },
+//   });
+// };
+// New API: Fetch purchase orders
+// Fetch purchase orders with location, mrr_no, and component_id
+// In api.js
+export const fetchPurchaseOrders = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/purchase-orders`, setAuthHeader());
+    console.log("Fetched purchase orders:", response.data);
+
+    // Ensure the response is an array
+    const purchaseOrders = Array.isArray(response.data) ? response.data : [];
+
+    // Format the data to ensure consistency
+    const formattedData = purchaseOrders.map(item => ({
+      po_id: item.po_id || null,
+      mrf_no: item.mrf_no || 'N/A',
+      po_number: item.po_number || 'N/A',
+      mpn: item.mpn || 'N/A',
+      mrr_no: item.mrr_no || 'N/A',
+      uom: item.uom || 'N/A',
+      mpn_received: item.mpn_received || 'N/A',
+      make_received: item.make_received || 'N/A',
+      date_code: item.date_code || 'N/A',
+      lot_code: item.lot_code || 'N/A',
+      received_quantity: item.received_quantity || 0,
+      passed_quantity: item.passed_quantity || 0,
+      coc_received: item.coc_received || false,
+      note: item.note || 'N/A',
+      failed_quantity: item.failed_quantity || 0,
+      material_in_quantity: item.material_in_quantity || 0,
+      item_description: item.item_description || 'N/A',
+      part_no: item.part_no || 'N/A',
+      make: item.make || 'N/A',
+      on_hand_quantity: item.on_hand_quantity || 0,
+      location: item.location || 'N/A',
+      updated_requested_quantity: item.updated_requested_quantity || 0,
+      status: item.status || 'Unknown',
+      vendor_name: item.vendor_name || 'N/A',
+      component_id: item.component_id || null
+    }));
+
+    console.log("Formatted purchase orders:", formattedData);
+    return formattedData;
+  } catch (error) {
+    console.error("Error fetching purchase orders:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch purchase orders: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Fetch purchase order details for a specific component
+export const fetchPurchaseOrderDetails = async (componentId) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/non_coc_components/nc-requests/purchase-orders/${componentId}`,
+      setAuthHeader()
+    );
+    console.log("Fetched purchase order details:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching purchase order details:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch purchase order details: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Update material in quantity
+export const updateMaterialIn = async ({ po_number, mpn, material_in_quantity }) => {
+  try {
+    // Fetch the po_id using po_number and mpn
+    const poResponse = await axios.get(`${API_BASE_URL}/purchase-orders`, setAuthHeader());
+    const purchaseOrder = poResponse.data.find(
+      (po) => po.po_number === po_number && po.mpn === mpn
+    );
+
+    if (!purchaseOrder) {
+      throw new Error(`Purchase order not found for po_number: ${po_number} and mpn: ${mpn}`);
+    }
+
+    const po_id = purchaseOrder.po_id;
+
+    const response = await axios.put(
+      `${API_BASE_URL}/purchase-orders/${po_id}/material-in`,
+      { 
+        material_in_quantity,
+        mrf_no: purchaseOrder.mrf_no // Pass mrf_no if available
+      },
+      setAuthHeader()
+    );
+    console.log("Material in updated:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating material in:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// POST: User Login
+export const loginUser = async (email, password) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+    const { token, user_id, role, permissions, name } = response.data;
+    localStorage.setItem("token", token);
+    localStorage.setItem("user_id", user_id);
+    localStorage.setItem("role", role);
+    localStorage.setItem("permissions", JSON.stringify(permissions));
+    localStorage.setItem("email", email);
+    localStorage.setItem("name", name);
+    return response.data;
+  } catch (error) {
+    console.error("Login error:", error.response?.data || error.message);
+    return { success: false, message: "Login failed" };
+  }
+};
+
+// POST: Create a Vendor
+export const createVendor = async (vendorData) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/vendors/vendors`, vendorData, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error creating vendor:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// GET: Fetch All Vendors
+export const fetchAllVendors = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/vendors/vendors`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching all vendors:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// PUT: Update a Vendor
+export const updateVendor = async (id, vendorData) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/vendors/vendors/${id}`, vendorData, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error updating vendor:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const updateVendorDetails = async (mrf_id, component_id, vendorDetails) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/vendors/update`,
+      {
+        mrf_id,
+        component_id,
+        vendor: vendorDetails.vendor,
+        vendor_link: vendorDetails.vendor_link,
+        approx_price: vendorDetails.approx_price,
+        expected_deliverydate: vendorDetails.expected_deliverydate,
+        certificate_desired: vendorDetails.certificate_desired,
+      },
+      setAuthHeader()
+    );
+    console.log("Vendor details updated:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating vendor details:", error.response?.data || error.message);
+    throw new Error(`Failed to update vendor details: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// POST: Raise Purchase Order
+export const raisePurchaseOrder = async (purchaseOrderData) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/purchase-orders/raise`,
+      purchaseOrderData,
+      setAuthHeader()
+    );
+    console.log("Purchase order raised:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error raising purchase order:", error.response?.data || error.message);
+    throw new Error(`Failed to raise purchase order: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Start: Add saveDraftPurchaseOrder
+export const saveDraftPurchaseOrder = async (purchaseOrderData) => {
+  try {
+    console.log("Saving draft purchase order with payload:", purchaseOrderData);
+    const response = await axios.post(
+      `${API_BASE_URL}/purchase-orders/draft`,
+      purchaseOrderData,
+      setAuthHeader()
+    );
+    console.log("Draft purchase order saved:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error saving draft purchase order:", error.response?.data || error.message);
+    throw new Error(`Failed to save draft purchase order: ${error.response?.data?.error || error.message}`);
+  }
+};
+// End: Add saveDraftPurchaseOrder
+
+// Start: Add getPaymentTerms
+export const getPaymentTerms = async () => {
+  try {
+    console.log("Fetching payment terms");
+    const response = await axios.get(`${API_BASE_URL}/purchase-orders/payment-terms`, setAuthHeader());
+    console.log("Fetched payment terms:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching payment terms:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch payment terms: ${error.response?.data?.error || error.message}`);
+  }
+};
+// End: Add getPaymentTerms
+
+// Start: Add createPaymentTerm
+export const createPaymentTerm = async (termData) => {
+  try {
+    console.log("Creating payment term with payload:", termData);
+    const response = await axios.post(
+      `${API_BASE_URL}/purchase-orders/create-payment-terms`,
+      termData,
+      setAuthHeader()
+    );
+    console.log("Payment term created:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating payment term:", error.response?.data || error.message);
+    throw new Error(`Failed to create payment term: ${error.response?.data?.error || error.message}`);
+  }
+};
+// End: Add createPaymentTerm
+
+// Start: Add getOtherTermsConditions
+export const getOtherTermsConditions = async () => {
+  try {
+    console.log("Fetching other terms & conditions");
+    const response = await axios.get(`${API_BASE_URL}/purchase-orders/other-terms-conditions`, setAuthHeader());
+    console.log("Fetched other terms & conditions:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching other terms & conditions:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch other terms & conditions: ${error.response?.data?.error || error.message}`);
+  }
+};
+// End: Add getOtherTermsConditions
+
+// Start: Add createOtherTermCondition
+export const createOtherTermCondition = async (termData) => {
+  try {
+    console.log("Creating other term/condition with payload:", termData);
+    const response = await axios.post(
+      `${API_BASE_URL}/purchase-orders/create-other-terms-conditions`,
+      termData,
+      setAuthHeader()
+    );
+    console.log("Other term/condition created:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating other term/condition:", error.response?.data || error.message);
+    throw new Error(`Failed to create other term/condition: ${error.response?.data?.error || error.message}`);
+  }
+};
+// End: Add createOtherTermCondition
+
+// GET: Search MRF Components
+export const searchMrfComponents = async (filters = {}) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/search-components`, {
+      params: filters,
+      ...setAuthHeader(),
+    });
+    console.log("Fetched MRF components:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching MRF components:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch MRF components: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// GET: Search MRF Components for Purchase Head
+export const searchMrfComponentsForPurchaseHead = async (filters = {}) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/search-components-purchase-head`, {
+      params: filters,
+      ...setAuthHeader(),
+    });
+    console.log("Fetched MRF components for Purchase Head:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching MRF components for Purchase Head:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch MRF components for Purchase Head: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// GET: Fetch All Purchase Orders
+export const fetchAllPurchaseOrders = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/purchase-orders//purchase-orders/`, setAuthHeader());
+    console.log("Fetched all purchase orders:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching all purchase orders:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch purchase orders: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+//new api
+// GET: Search MRF Components for Purchase Head
+export const searchMrfComponentsForPORaised = async (filters = {}) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/search-components-po-raised`, {
+      params: filters,
+      ...setAuthHeader(),
+    });
+    console.log("Fetched MRF components for Purchase Head:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching MRF components for Purchase Head:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch MRF components for Purchase Head: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const fetchUserDetails = async (userId) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/users/${userId}`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching user details:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// GET: Fetch User Permissions
+export const fetchUserPermissions = async (email) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/auth/user-permissions/${email}`, setAuthHeader());
+    console.log("Fetched user permissions:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Permission fetch error:", error.response?.data || error.message);
+    return { role: null, permissions: {} };
+  }
+};
+
+// FETCH NON-COC DATA
+export const fetchNonCOCData = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/noncoc`, setAuthHeader());
+    console.log("Raw NON-COC API response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching NON-COC data:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// IMPORT NON-COC DATA
+export const importNonCOCData = async (data) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/noncoc/import`, { data }, setAuthHeader());
+    console.log("Import response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error importing NON-COC data:", error.response?.data || error.message);
+    throw error;
+  }
+}; 
+
+export const submitReturnForm = async (items) => {
+  const response = await fetch(`${API_BASE_URL}/returns/submit-return-form`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ items }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to submit return form");
+  }
+
+  return response.json(); // Returns { message, urfNo, status }
+};
+
+// Fetch Return Requests
+export const fetchReturnRequests = async (type = "pending") => {
+  try {
+    let endpoint = `${API_BASE_URL}/returns/return-requests`;
+    if (type === "past") {
+      endpoint = `${API_BASE_URL}/returns/past-return-requests`;
+    } else if (type === "all") {
+      // Fetch both pending and past requests for inventory users
+      const [pendingResponse, pastResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/returns/return-requests`, setAuthHeader()),
+        axios.get(`${API_BASE_URL}/returns/past-return-requests`, setAuthHeader()),
+      ]);
+      const combinedData = [...pendingResponse.data, ...pastResponse.data];
+      console.log(`Combined return requests for type 'all':`, combinedData);
+      // Log the structure of each request
+      combinedData.forEach((req, index) => {
+        console.log(`Return Request ${index} (type 'all'):`, {
+          user_id: req.user_id,
+          status: req.status,
+          fullRequest: req,
+        });
+      });
+      return combinedData.map(req => ({
+        ...req,
+        status: req.status || "Unknown", // Fallback for missing status
+      }));
+    }
+    const response = await axios.get(endpoint, setAuthHeader());
+    console.log(`Fetched ${type} return requests:`, response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`Return Request ${index} (type '${type}'):`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data.map(req => ({
+      ...req,
+      status: req.status || "Unknown", // Fallback for missing status
+    }));
+  } catch (error) {
+    console.error(`Error fetching ${type} return requests:`, error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch User's Own Return Requests
+export const fetchUserReturnRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/returns/user-return-requests`, setAuthHeader());
+    console.log("Fetched user's return requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`User Return Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data.map(req => ({
+      ...req,
+      status: req.status || "Unknown", // Fallback for missing status
+      user_id: req.user_id || "unknown", // Fallback for missing user_id
+    }));
+  } catch (error) {
+    console.error("Error fetching user's return requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Approve Return Request
+export const approveReturnRequest = async (urf_id, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/returns/approve-return/${urf_id}`,
+      { note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving return request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Reject Return Request
+export const rejectReturnRequest = async (urf_id, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/returns/reject-return/${urf_id}`,
+      { note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting return request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Update Non-COC Location
+export const updateNonCOCLocation = async (component_id, location) => {
+  try {
+    // Validate inputs
+    if (!component_id || isNaN(parseInt(component_id))) {
+      throw new Error("Invalid component_id: Component ID must be a valid integer");
+    }
+    if (!location || typeof location !== 'string' || location.trim() === '') {
+      throw new Error("Invalid location: Location must be a non-empty string");
+    }
+
+    console.log("Sending update request:", { component_id, location });
+    const response = await axios.put(
+      `${API_BASE_URL}/locations/noncoc/${component_id}`,
+      payload,
+      setAuthHeader()
+    );
+    console.log("Update location response:", response.data);
+
+    // Fetch updated data to ensure frontend reflects the latest state
+    const updatedData = await fetchNonCOCData();
+    return { ...response.data, updatedData };
+  } catch (error) {
+    console.error("Error updating location:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    throw new Error(`Failed to update location: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+
+// FETCH USER LOGS
+export const fetchUserLogs = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/admin/logs`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching User Logs:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// FETCH USERS ISSUE MATERIAL REQUESTS
+export const fetchNonCOCRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/ncRequests`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching Non-COC Requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// POST: Add to Basket
+export const addToBasket = async (item) => {
+  const token = localStorage.getItem("token");
+  const response = await axios.post(
+    "http://localhost:5000/api/non_coc_components/add-to-basket",
+    { component_id: item.component_id },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return response.data;
+};
+
+// GET: stock card
+export const fetchStockCardData = async (componentId, periodFrom, periodTo) => {
+  const token = localStorage.getItem("token");
+  try {
+    const params = { componentId };
+    if (periodFrom) params.periodFrom = periodFrom;
+    if (periodTo) params.periodTo = periodTo;
+
+    const response = await axios.get(
+      `http://localhost:5000/api/non_coc_components/nc-requests/stock-card/${componentId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching stock card data:", error);
+    throw error;
+  }
+};
+
+export const fetchBasketItemsForUMIF = async () => {
+  try {
+    console.log(`Fetching basket items from: ${API_BASE_URL}/noncoc_umif/basket-items`);
+    const response = await axios.get(`${API_BASE_URL}/noncoc_umif/basket-items`, setAuthHeader());
+    if (response.data && !Array.isArray(response.data)) {
+      console.warn("Unexpected response format:", response.data);
+      return [];
+    }
+    console.log("Fetched basket items:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching basket items for UMIF:", {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data || error.response,
+      stack: error.stack,
+    });
+    throw new Error(`Failed to fetch basket items: ${error.message}`);
+  }
+};
+
+// Update UMIF quantity
+export const updateBasketQuantities = async (basket_id, requested_quantity) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/noncoc_umif/update-quantities`,
+      { basket_id, requested_quantity },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating basket quantities:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// FETCH PROJECTS
+export const fetchProjects = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/noncoc_umif/projects`, 
+      setAuthHeader());
+    // console.log("Fetched projects:", response.data);
+    if (!Array.isArray(response.data)) {
+      console.warn("Unexpected response format:", response.data);
+      throw new Error("Expected an array of project names");
+    }
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching projects:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch projects: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const submitMaterialIssueForm = async ({ items }) => {
+  try {
+    // Validate items array before sending
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new Error("No valid items provided for submission");
+    }
+    items.forEach(item => {
+      if (!item.basket_id || !Number.isInteger(item.requested_quantity) || item.requested_quantity < 0) {
+        throw new Error(`Invalid item data: ${JSON.stringify(item)}`);
+      }
+    });
+
+    console.log("Submitting material issue form with payload:", { items });
+    const response = await axios.post(
+      `${API_BASE_URL}/noncoc_umif/submit-material-issue`,
+      { items },
+      setAuthHeader()
+    );
+    console.log("Material issue form submission response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting material issue form:", {
+      message: error.message,
+      response: error.response?.data || error.response,
+      status: error.response?.status,
+    });
+    throw new Error(`Failed to submit material issue form: ${error.response?.data?.error || error.message}`);
+  }
+};
+export const submitMaterialRequestForm = async ({ items, basket_ids }) => {
+  try {
+    // Validate inputs
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error("Items array is empty or invalid");
+    }
+    if (!Array.isArray(basket_ids) || basket_ids.length === 0) {
+      throw new Error("Basket IDs array is empty or invalid");
+    }
+    if (items.length !== basket_ids.length) {
+      throw new Error("Mismatch between items and basket_ids lengths");
+    }
+
+    const sanitizedItems = items.map(item => {
+      const requestedQty = parseInt(item.requested_quantity) || 0;
+      if (requestedQty <= 0) {
+        throw new Error(`Invalid requested quantity for component_id ${item.component_id}: ${requestedQty}`);
+      }
+      if (!item.component_id) {
+        throw new Error("Missing component_id in item");
+      }
+
+      // Ensure user_id is an integer
+      let userId = item.user_id;
+      if (typeof userId === 'string') {
+        userId = parseInt(userId, 10);
+      }
+      if (!Number.isInteger(userId) || userId <= 0) {
+        throw new Error(`Invalid user_id for component_id ${item.component_id}: ${item.user_id}`);
+      }
+
+      if (!item.date || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(item.date)) {
+        throw new Error(`Invalid date format for component_id ${item.component_id}: ${item.date}`);
+      }
+
+      return {
+        component_id: item.component_id,
+        requested_quantity: requestedQty,
+        project_name: item.project_name,
+        date: item.date,
+        user_id: userId, // Use the parsed integer user_id
+        status: item.status, // Ensure status is passed as provided
+        vendorDetails: item.vendorDetails,
+      };
+    });
+
+    console.log("Sending MRF submission payload:", { items: sanitizedItems, basket_ids });
+    const response = await axios.post(
+      `${API_BASE_URL}/noncoc_umif/submit-material-request`,
+      { items: sanitizedItems, basket_ids },
+      setAuthHeader()
+    );
+    console.log("MRF submission response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting material request form:", {
+      message: error.message,
+      response: error.response?.data || error.response,
+      status: error.response?.status,
+    });
+    throw error;
+  }
+};
+
+export const deleteBasketItem = async (basketId) => {
+  try {
+    console.log(`Deleting basket item at: ${API_BASE_URL}/noncoc_umif/basket-item/${basketId}`);
+    const headers = setAuthHeader();
+    console.log("Headers:", headers);
+    const response = await axios.delete(
+      `${API_BASE_URL}/noncoc_umif/basket-item/${basketId}`,
+      headers
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting basket item:", error.response?.data || error.message);
+    if (error.response && error.response.status === 404) {
+      throw new Error("Basket item not found.");
+    }
+    throw error;
+  }
+};
+
+// My Requests APIs (MIF)
+export const fetchMyRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/my-requests`, setAuthHeader());
+    // console.log("Fetched my requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      // console.log(`MIF Request ${index}:`, {
+      //   user_id: req.user_id,
+      //   status: req.status,
+      //   fullRequest: req,
+      // });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchMyRequestDetails = async (umi) => {
+  try {
+    if (!umi) {
+      throw new Error("UMI is undefined or invalid");
+    }
+    console.log(`Fetching request details for UMI: ${umi}`);
+    const response = await axios.get(`${API_BASE_URL}/approvals/my-request-details/${umi}`, setAuthHeader());
+    console.log("FetchMyRequestDetails response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my request details:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    throw error;
+  }
+};
+
+// My Requests APIs (MRF)
+export const fetchMyMrfRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/mrf-requests`, setAuthHeader());
+    console.log("Fetched my MRF requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`MRF Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my MRF requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchMyMrfRequestDetails = async (mrf_no) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/mrf-request-details/${mrf_no}`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my MRF request details:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// MIF Approvals (head & admin)
+export const fetchApprovalRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/approval-requests`, setAuthHeader());
+    console.log("fetchApprovalRequests response:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`Approval Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching approval requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch Inventory Approval Requests
+export const fetchInventoryApprovalRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/inventory-approval-requests`, setAuthHeader());
+    console.log("Fetched inventory approval requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`Inventory Approval Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching inventory approval requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Approve Inventory Request
+export const approveInventoryRequest = async (umi, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/approvals/inventory-approve-request/${umi}`,
+      { note },
+      setAuthHeader()
+    );
+    console.log("Inventory approve request response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error approving inventory request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchPastApprovedRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/past-approved`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching past approved requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchRequestDetails = async (umi) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/request-details/${umi}`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching request details:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const approveRequest = async (umi, { updatedItems, note, priority }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/approvals/approve-request/${umi}`,
+      { updatedItems, note, priority },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Check MRF Existence
+export const fetchMrfExistence = async (umi) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/approvals/check-mrf/${umi}`, setAuthHeader());
+    return response.data; // { exists: boolean, mrf_no: string | null }
+  } catch (error) {
+    console.error(`Error checking MRF existence for UMI ${umi}:`, error.response?.data || error.message);
+    return { exists: false, mrf_no: null };
+  }
+};
+
+// MRF Approval Requests
+export const fetchMrfApprovalRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/approval-requests`, setAuthHeader());
+    console.log("fetchMrfApprovalRequests response:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`MRF Approval Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching MRF approval requests:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch MRF approval requests: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Fetch Purchase Approval Requests
+export const fetchPurchaseApprovalRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/purchase-approval-requests`, setAuthHeader());
+    console.log("Fetched purchase approval requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`Purchase Approval Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching purchase approval requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Approve Purchase Request
+export const approvePurchaseRequest = async (mrf_no, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/mrf-approvals/purchase-approve-request/${mrf_no}`,
+      { note },
+      setAuthHeader()
+    );
+    console.log("Purchase approve request response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error approving purchase request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch CEO Approval Requests
+export const fetchCEOApprovalRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/mrf-approvals/ceo-approval-requests`, setAuthHeader());
+    console.log("Fetched CEO approval requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`CEO Approval Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching CEO approval requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Approve CEO Request
+export const approveCEORequest = async (mrf_no, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/mrf-approvals/ceo-approve-request/${mrf_no}`,
+      { note },
+      setAuthHeader()
+    );
+    console.log("CEO approve request response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error approving CEO request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+export const rejectRequest = async (umi, { note }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/approvals/reject-request/${umi}`,
+      { note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchPastMrfApprovedRequests = async (params = {}) => {
+  const { date } = params;
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/mrf-approvals/past-approved${date ? `?date=${date}` : ''}`,
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("API Error fetching past MRF approved requests:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch past approved requests: ${error.response?.statusText || error.message}`);
+  }
+};
+
+export const fetchMrfRequestDetails = async (mrf_no, isPastApproved = false) => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/mrf-approvals/request-details/${mrf_no}${isPastApproved ? '?past=true' : ''}`,
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("API Error:", error.response?.status, error.response?.statusText, error.response?.data || error.message);
+    throw new Error(`Failed to fetch MRF request details: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Add to api.js
+export const confirmMrfReceipt = async (mrf_no) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/mrf-approvals/confirm-receipt/${mrf_no}`,
+      {},
+      setAuthHeader()
+    );
+    window.dispatchEvent(new CustomEvent('statusChange', { detail: { mrfNo: mrf_no, status: 'Request Accepted' } }));
+    return response.data;
+  } catch (error) {
+    console.error("Error confirming MRF receipt:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const approveMrfRequest = async (mrf_no, { updatedItems, note, priority, quotationRefNo, vendor }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/mrf-approvals/approve-request/${mrf_no}`,
+      { updatedItems, note, priority, quotationRefNo, vendor },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving MRF request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const rejectMrfRequest = async (mrf_no, { note, reason }) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/mrf-approvals/reject-request/${mrf_no}`,
+      { note, reason },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting MRF request:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch pending non-COC issue requests
+export const fetchPendingNonCOCIssueRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nc-requests/pending`, setAuthHeader());
+    console.log("Fetched pending non-COC issue requests:", response.data);
+    // Log the structure of each request
+    response.data.forEach((req, index) => {
+      console.log(`Pending Non-COC Request ${index}:`, {
+        user_id: req.user_id,
+        status: req.status,
+        fullRequest: req,
+      });
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching pending non-COC issue requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch past non-COC issued requests
+export const fetchPastNonCOCIssuedRequests = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nc-requests/past-issued`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching past non-COC issued requests:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch details of a specific non-COC issue request
+export const fetchNonCOCIssueRequestDetails = async (umi) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nc-requests/issue-details/${umi}`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching non-COC issue request details:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const deleteMRFItem = async (mrfId, componentId, userId) => {
+  try {
+    console.log(`Deleting MRF item at: ${API_BASE_URL}/noncoc_umif/mrf-item/${mrfId}`);
+    const headers = setAuthHeader();
+    console.log("Headers:", headers);
+    // Pass componentId and userId in the request body or query if needed by backend
+    const response = await axios.delete(
+      `${API_BASE_URL}/noncoc_umif/mrf-item/${mrfId}`,
+      {
+        ...headers,
+        data: { componentId, userId } // Include componentId and userId in the request body
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting MRF item:", error.response?.data || error.message);
+    if (error.response && error.response.status === 404) {
+      throw new Error("MRF item not found.");
+    }
+    throw error;
+  }
+};
+
+// Submit non-COC material issue form
+export const submitNonCOCMaterialIssueForm = async (umi, items, issue_date, note) => {
+  try {
+    console.log("Submitting with payload:", { umi, items, issue_date, note});
+    const response = await axios.post(
+      `${API_BASE_URL}/nc-requests/submit-material-issue`,
+      { umi, items, issue_date, note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting non-COC material issue form:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchPastIssuedRequestDetails = async (mi) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nc-requests/past-issued-details/${mi}`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching past issued request details:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const confirmNotificationReceipt = async (umi) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/notifications/confirm/${umi}`,
+      {},
+      setAuthHeader()
+    );
+    window.dispatchEvent(new CustomEvent('statusConfirm', { detail: { umiNo: umi, status: 'Issued' } }));
+    return response.data;
+  } catch (error) {
+    console.error('Error confirming receipt:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Create a new location
+export const createLocation = async (locationData) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/locations`, locationData, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error creating location:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch all locations
+export const fetchLocations = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/locations`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching locations:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch parent locations
+export const fetchParentLocations = async (type = "") => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/locations/parents`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching parent locations:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch all locations from the locations table
+export const fetchAllLocations = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/locations/all`, setAuthHeader());
+    if (!Array.isArray(response.data)) {
+      console.warn("Unexpected response format from /locations/all:", response.data);
+      throw new Error("Expected an array of locations, but received a different format.");
+    }
+    console.log("Fetched all locations:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching all locations:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch all purchase order components
+export const fetchPurchaseOrderComponents = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/nc-requests/purchase-order-components`, setAuthHeader());
+    console.log("Fetched purchase order components:", response.data);
+
+    // Ensure the response is an array
+    const components = Array.isArray(response.data) ? response.data : [];
+    
+    // Format the data to ensure consistency
+    const formattedComponents = components.map(item => ({
+      po_number: item.po_number || 'N/A',
+      mpn: item.mpn || 'N/A',
+      component_id: item.component_id || null,
+      location: item.location || 'N/A',
+      status: item.status || 'Unknown'
+    }));
+
+    console.log("Formatted purchase order components:", formattedComponents);
+    return formattedComponents;
+  } catch (error) {
+    console.error("Error fetching purchase order components:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch purchase order components: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+//status change for quality check 
+// Update purchase order status using axios
+export const updatePurchaseOrderStatus = async ({ po_number, mpn, status }) => {
+  // Check user role before proceeding
+  const role = localStorage.getItem('role');
+  const allowedRoles = ["inventory_head", "inventory_employee", "admin"];
+  if (!role || !allowedRoles.includes(role)) {
+    throw new Error("Unauthorized: Only inventory team or admin can update purchase order status");
+  }
+
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/nc-requests/update-po-status`,
+      { po_number, mpn, status },
+      setAuthHeader()
+    );
+    console.log("Updated purchase order status:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating purchase order status:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+
+export const confirmReceipt = async (umi) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/nc-requests/confirm-receipt/${umi}`,
+      {},
+      setAuthHeader()
+    );
+    window.dispatchEvent(new CustomEvent('statusChange', { detail: { umiNo: umi, status: 'Receiving Pending' } }));
+    return response.data;
+  } catch (error) {
+    console.error("Error confirming receipt:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const approveNonCOCMaterialIssueForm = async (umi, items, issue_date, note) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/nc-requests/submit-material-issue`,
+      { umi, items, issue_date, note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving non-COC material issue form:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const rejectNonCOCMaterialIssueForm = async (umi, note) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/nc-requests/reject/${umi}`,
+      { note },
+      setAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting non-COC material issue form:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Fetch pending notifications
+export const fetchPendingNotifications = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/notifications/pending`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching pending notifications:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// Mark notification as read
+export const markNotificationAsRead = async (notificationId) => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/notifications/${notificationId}/read`, {}, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error('Error marking notification as read:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// NEW: Add API utility to fetch vendors
+export const fetchVendors = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/vendors`, setAuthHeader());
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching vendors:", error);
+    throw error;
+  }
+};
+
+
+export const fetchQualityInspectionComponents = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/quality-inspection/quality-inspection-components`, setAuthHeader());
+    console.log("Fetched quality inspection components:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching quality inspection components:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const fetchBackorderQualityInspectionComponents = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/quality-inspection/backorder-quality-inspection`, setAuthHeader());
+    console.log("Fetched Backorder quality inspection components:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching Backorder quality inspection components:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch backorder quality inspection components: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const fetchQCdoneComponents = async () => {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/quality-inspection/quality-inspection-done`,
+      setAuthHeader()
+    );
+
+    // Log the successful response for debugging
+    console.log("Fetched quality inspection components:", response.data);
+
+    // Validate the response structure
+    if (!response.data || !response.data.data || !response.data.data.overview || !response.data.data.components) {
+      throw new Error("Invalid response structure: Expected data with overview and components");
+    }
+
+    return response.data;
+  } catch (error) {
+    // Enhanced error handling
+    let errorMessage = "Failed to fetch QC done components";
+    if (error.response) {
+      // Server responded with a status other than 2xx
+      if (error.response.status === 403) {
+        errorMessage = "Unauthorized: Only quality team or admin can access QC done components";
+      } else if (error.response.status === 401) {
+        errorMessage = "Session expired. Please log in again.";
+      } else {
+        errorMessage = error.response.data?.error || errorMessage;
+      }
+      console.error(
+        "Error fetching quality inspection components:",
+        error.response.data || error.message
+      );
+    } else if (error.request) {
+      // No response received (network error)
+      errorMessage = "Network error: Unable to reach the server";
+      console.error("Network error fetching quality inspection components:", error.message);
+    } else {
+      // Error setting up the request
+      console.error("Error setting up request for quality inspection components:", error.message);
+    }
+
+    throw new Error(errorMessage);
+  }
+};
+
+export const updateQualityInspectionStatus = async ({
+  po_number,
+  mpn,
+  status,
+  received_mpn,
+  received_make,
+  date_code,
+  lot_code,
+  received_quantity,
+  passed_quantity,
+  failed_quantity,
+  coc_received,
+  note,
+  source
+}) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}/quality-inspection/quality-inspection-components/status`,
+      {
+        po_number,
+        mpn,
+        status,
+        received_mpn,
+        received_make,
+        date_code,
+        lot_code,
+        received_quantity,
+        passed_quantity,
+        failed_quantity,
+        coc_received,
+        note,
+        source
+      },
+      setAuthHeader()
+    );
+    console.log("Updated quality inspection status:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating quality inspection status:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const submitBackorder = async (components) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/backorder`,
+      { components },
+      setAuthHeader()
+    );
+    console.log("Backorder submitted:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting backorder:", error.response?.data || error.message);
+    throw new Error(`Failed to submit backorder: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const submitReturn = async (components) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/return`,
+      { components },
+      setAuthHeader()
+    );
+    console.log("Return submitted:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting return:", error.response?.data || error.message);
+    throw new Error(`Failed to submit return: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+export const fetchDocuments = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/documents`, setAuthHeader());
+    console.log('Fetched documents:', response.data);
+    return response.data; // Return data as-is; base64 handling is done in frontend
+  } catch (error) {
+    console.error('Error fetching documents:', error.response?.data || error.message);
+    throw new Error(`Failed to fetch documents: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Fetch quality checkpoints (already exists, but included for reference)
+export const fetchCheckpoints = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/quality-checkpoints`, setAuthHeader());
+    console.log("Fetched checkpoints:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching checkpoints:", error.response?.data || error.message);
+    throw new Error(`Failed to fetch checkpoints: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Create a new quality checkpoint
+export const createQualityCheckpoint = async (checkpointData) => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/quality-checkpoints/create`,
+      checkpointData,
+      setAuthHeader()
+    );
+    console.log("Created quality checkpoint:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating quality checkpoint:", error.response?.data || error.message);
+    throw new Error(`Failed to create quality checkpoint: ${error.response?.data?.error || error.message}`);
+  }
+};
+
+// Logout User
+export const logoutUser = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("permissions");
+  localStorage.removeItem("user_id");
+  localStorage.removeItem("email");
+  localStorage.removeItem("name");
+  sessionStorage.clear();
+  window.location.href = "/login";
+};

@@ -1,0 +1,117 @@
+/* TableStyling.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box; /* Ensure padding doesn’t affect widths */
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  overflow: visible;
+}
+
+.max-w-7xl {
+  overflow: visible;
+}
+
+.bg-white {
+  overflow: visible;
+}
+
+.table-container {
+  position: relative;
+  max-height: 65vh;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  -webkit-overflow-scrolling: touch;
+  isolation: isolate;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  position: relative;
+}
+
+.table-container::-webkit-scrollbar,
+.table-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track,
+.table-wrapper::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb,
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 4px;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 1000px;
+  table-layout: auto; /* Allow columns to size based on content */
+}
+
+th,
+td {
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #4a5568;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 1px 0 0 #e2e8f0;
+  border-bottom: 2px solid #d2d6dc;
+  -webkit-position: sticky;
+  -moz-position: sticky;
+}
+
+thead {
+  position: relative;
+  z-index: 11;
+}
+
+tr:hover td {
+  background: #f0f7ff;
+}
+
+button,
+select {
+  transition: all 0.2s ease-in-out;
+}
+
+select {
+  background: #ffffff;
+}
+
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.table-container .loading-overlay {
+  z-index: 20;
+}
