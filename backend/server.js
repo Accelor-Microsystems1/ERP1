@@ -63,7 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: "https://erp1-1-ih0r.onrender.com/",
+    origin: "https://erp1-1-ih0r.onrender.com",
     credentials: true,
   })
 );
