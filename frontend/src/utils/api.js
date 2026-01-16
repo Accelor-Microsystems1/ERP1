@@ -864,7 +864,7 @@ export const fetchNonCOCRequests = async () => {
 export const addToBasket = async (item) => {
   const token = localStorage.getItem("token");
   const response = await axios.post(
-    "http://localhost:5000/api/non_coc_components/add-to-basket",
+    "https://erp1-iwt1.onrender.com/api/non_coc_components/add-to-basket",
     { component_id: item.component_id },
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -880,7 +880,7 @@ export const fetchStockCardData = async (componentId, periodFrom, periodTo) => {
     if (periodTo) params.periodTo = periodTo;
 
     const response = await axios.get(
-      `http://localhost:5000/api/non_coc_components/nc-requests/stock-card/${componentId}`,
+      `hhttps://erp1-iwt1.onrender.com/api/non_coc_components/nc-requests/stock-card/${componentId}`,
       {
         headers: { Authorization: `Bearer ${token}` },
         params,
