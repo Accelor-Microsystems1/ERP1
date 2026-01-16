@@ -38,15 +38,31 @@ const directPoRoutes = require('./routes/directPoRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const io = require('socket.io')(server, {
-  cors: {
-    origin: [
-      
-      "*" // production
-    ],
-    methods: ["GET", "POST"]
-  }
+const allowedOrigins = [
+  "https://erp1-1-ih0r.onrender.com"
+];
+
+// ✅ ONE SINGLE CORS CONFIG
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS blocked"));
+    }
+  },
+  credentials: true
+};
+
+
+// SOCKET.IO (same CORS)
+const io = new Server(server, {
+  cors: corsOptions
 });
+
+
+
 
 
 // Serve static files from the uploads directory
@@ -61,12 +77,7 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
+
 
 // Map to store user_id to socket_id
 const userSocketMap = new Map();
@@ -158,6 +169,7 @@ const multerErrorHandler = (err, req, res, next) => {
   }
   next(err);
 };
+
 
 
 // Routes
@@ -1781,7 +1793,9 @@ app.use((err, req, res, next) => {
   console.error("Server error:", err);
   res.status(500).json({ error: "Internal server error" });
 });
-
+server.listen(process.env.PORT || 5000, () => {
+  console.log("Server running");
+});
 // Start Server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
